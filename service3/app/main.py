@@ -1,20 +1,26 @@
-from app.core.database import Base, engine
-from app.models import task
+# app/main.py
+# Serviço 3 – Analisador/Contador de Tarefas
+# FastAPI + SQLAlchemy (SQLite em dev, compatível com o banco do Serviço 1)
+#
+# NOTA IMPORTANTE:
+#   Este serviço é SOMENTE LEITURA no banco de tarefas.
+#   Ele não cria nem migra tabelas — essa responsabilidade é do Serviço 1 (Prisma).
+#   Apenas importamos os models para que o SQLAlchemy saiba mapeá-los.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
+from app.models import task  # noqa: F401 — registra o model no metadata
 from app.routers import analytics
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Não criamos tabelas aqui — o Serviço 1 (Prisma) é o dono do schema
     yield
 
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -34,7 +40,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET"],   # Serviço 3 só responde GETs
     allow_headers=["*"],
 )
 

@@ -1,23 +1,29 @@
+# app/core/database.py
+# Configuração do banco de dados para o Serviço 3
+#
+# Em desenvolvimento: aponta para o mesmo dev.db do Serviço 1
+# Em produção: use uma replica de leitura ou banco separado sincronizado
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.core.config import settings
 
-DATABASE_URL = settings.DATABASE_URL
-
-print("database_url:", DATABASE_URL)
-
 connect_args = {}
-if DATABASE_URL.startswith("sqlite"):
+if settings.DATABASE_URL.startswith("sqlite"):
+    # check_same_thread=False necessário para SQLite em contexto async/multi-thread
     connect_args = {"check_same_thread": False}
 
 engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args
+    settings.DATABASE_URL,
+    connect_args=connect_args,
+    echo=settings.DEBUG,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 def get_db():

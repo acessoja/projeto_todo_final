@@ -21,12 +21,12 @@ model Usuario {
 }
 
 model Tarefa {
-  id         Int     @id @default(autoincrement())
-  titulo     String
-  concluida  Boolean @default(false)
-  usuarioId  Int
-usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  titulo    String
+  concluida Boolean @default(false)
+  usuarioId Int
+
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("tarefas")
-
 }
