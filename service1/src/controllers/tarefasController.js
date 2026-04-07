@@ -1,45 +1,19 @@
-// src/controllers/tarefasController.js
-// Controller de Tarefas — versão integrada com Serviço 2 (Logs) e Serviço 3 (Stats)
-//
-// MUDANÇAS EM RELAÇÃO AO ORIGINAL:
-//   - Import e uso real do logService (antes estava comentado)
-//   - Todos os IDs normalizados para Number antes de ir ao Prisma
-//   - concluirTarefa agora busca usuario para passar ao log
-//   - deletarTarefa registra log de erro quando não encontrado
-
 import prisma from "../prismaClient.js";
 import { createError } from "../middleware/errorHandler.js";
 import { logService } from "../services/logService.js";
 
-/**
- * POST /api/tarefas
- * Body: { titulo: string, usuarioId: number }
- */
 export async function criarTarefa(req, res, next) {
   try {
-    const { titulo, usuarioId } = req.body;
-
-    const usuarioExiste = await prisma.usuario.findUnique({
-      where: { id: Number(usuarioId) },
-      select: { id: true },
-    });
-
-    if (!usuarioExiste) {
-      await logService.erro(
-        `Tentativa de criar tarefa para usuário inexistente (id: ${usuarioId})`,
-        null
-      );
-      throw createError(404, `Usuário com id ${usuarioId} não encontrado.`);
-    }
+    const { titulo } = req.body;
+    const usuarioId = req.user.id;
 
     const tarefa = await prisma.tarefa.create({
       data: {
         titulo,
-        usuarioId: Number(usuarioId),
+        usuarioId,
       },
     });
 
-    // Notifica Serviço 2 — sem bloquear a resposta
     await logService.tarefaCriada(usuarioId, titulo);
 
     return res.status(201).json(tarefa);
@@ -48,29 +22,13 @@ export async function criarTarefa(req, res, next) {
   }
 }
 
-/**
- * GET /api/tarefas/usuario/:id
- * Lista tarefas de um usuário (filtradas por usuarioId — nunca mistura usuários)
- */
-export async function listarTarefasPorUsuario(req, res, next) {
+export async function listarMinhasTarefas(req, res, next) {
   try {
-    const usuarioId = Number(req.params.id);
-
-    const usuarioExiste = await prisma.usuario.findUnique({
-      where: { id: usuarioId },
-      select: { id: true },
-    });
-
-    if (!usuarioExiste) {
-      throw createError(404, `Usuário com id ${usuarioId} não encontrado.`);
-    }
+    const usuarioId = req.user.id;
 
     const tarefas = await prisma.tarefa.findMany({
       where: { usuarioId },
-      orderBy: [
-        { concluida: "asc" },  // pendentes primeiro
-        { id: "desc" },
-      ],
+      orderBy: [{ concluida: "asc" }, { id: "desc" }],
     });
 
     return res.status(200).json(tarefas);
@@ -79,24 +37,21 @@ export async function listarTarefasPorUsuario(req, res, next) {
   }
 }
 
-/**
- * PATCH /api/tarefas/:id/concluir
- * Marca como concluída e notifica Serviço 2
- */
 export async function concluirTarefa(req, res, next) {
   try {
     const tarefaId = Number(req.params.id);
+    const usuarioId = req.user.id;
 
-    const tarefaExiste = await prisma.tarefa.findUnique({
-      where: { id: tarefaId },
+    const tarefaExiste = await prisma.tarefa.findFirst({
+      where: { id: tarefaId, usuarioId },
     });
 
     if (!tarefaExiste) {
       await logService.erro(
-        `Erro ao tentar concluir tarefa inexistente (id: ${tarefaId})`,
-        null
+        `Usuário ${usuarioId} tentou concluir tarefa inexistente/sem acesso (id: ${tarefaId})`,
+        usuarioId
       );
-      throw createError(404, `Tarefa com id ${tarefaId} não encontrada.`);
+      throw createError(404, "Tarefa não encontrada para o usuário logado.");
     }
 
     const tarefa = await prisma.tarefa.update({
@@ -104,11 +59,7 @@ export async function concluirTarefa(req, res, next) {
       data: { concluida: true },
     });
 
-    await logService.tarefaConcluida(
-      tarefa.usuarioId,
-      tarefa.id,
-      tarefa.titulo
-    );
+    await logService.tarefaConcluida(usuarioId, tarefa.id, tarefa.titulo);
 
     return res.status(200).json(tarefa);
   } catch (err) {
@@ -116,19 +67,18 @@ export async function concluirTarefa(req, res, next) {
   }
 }
 
-/**
- * DELETE /api/tarefas/:id
- */
 export async function deletarTarefa(req, res, next) {
   try {
     const tarefaId = Number(req.params.id);
+    const usuarioId = req.user.id;
 
-    const tarefaExiste = await prisma.tarefa.findUnique({
-      where: { id: tarefaId },
+    const tarefaExiste = await prisma.tarefa.findFirst({
+      where: { id: tarefaId, usuarioId },
+      select: { id: true },
     });
 
     if (!tarefaExiste) {
-      throw createError(404, `Tarefa com id ${tarefaId} não encontrada.`);
+      throw createError(404, "Tarefa não encontrada para o usuário logado.");
     }
 
     await prisma.tarefa.delete({ where: { id: tarefaId } });
@@ -139,14 +89,9 @@ export async function deletarTarefa(req, res, next) {
   }
 }
 
-/**
- * GET /api/tarefas/usuario/:id/stats
- * Retorna estatísticas filtradas por usuário
- * (Serviço 3 também fornece esse endpoint, mas este serve como fallback interno)
- */
-export async function estatisticasPorUsuario(req, res, next) {
+export async function minhasEstatisticas(req, res, next) {
   try {
-    const usuarioId = Number(req.params.id);
+    const usuarioId = req.user.id;
 
     const [total, concluidas] = await Promise.all([
       prisma.tarefa.count({ where: { usuarioId } }),

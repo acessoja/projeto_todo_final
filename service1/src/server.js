@@ -1,7 +1,3 @@
-// src/server.js
-// Ponto de entrada do servidor
-// Separado do app.js para facilitar testes de integração
-
 import app from "./app.js";
 import prisma from "./prismaClient.js";
 
@@ -9,7 +5,6 @@ const PORT = process.env.PORT || 3001;
 
 async function iniciarServidor() {
   try {
-    // Verifica a conexão com o banco antes de subir o servidor
     await prisma.$connect();
     console.log("✅ Banco de dados conectado com sucesso!");
 
@@ -20,14 +15,14 @@ async function iniciarServidor() {
       console.log(`   Saúde: http://localhost:${PORT}/health`);
       console.log("────────────────────────────────────────────");
       console.log("📋 Rotas disponíveis:");
+      console.log(`   POST   /api/usuarios/register`);
+      console.log(`   POST   /api/usuarios/login`);
+      console.log(`   GET    /api/usuarios/me`);
       console.log(`   POST   /api/tarefas`);
-      console.log(`   GET    /api/tarefas/usuario/:id`);
-      console.log(`   GET    /api/tarefas/usuario/:id/stats`);
+      console.log(`   GET    /api/tarefas`);
+      console.log(`   GET    /api/tarefas/stats`);
       console.log(`   PATCH  /api/tarefas/:id/concluir`);
       console.log(`   DELETE /api/tarefas/:id`);
-      console.log(`   POST   /api/usuarios`);
-      console.log(`   GET    /api/usuarios`);
-      console.log(`   GET    /api/usuarios/:id`);
       console.log("────────────────────────────────────────────");
     });
   } catch (err) {
@@ -36,7 +31,6 @@ async function iniciarServidor() {
   }
 }
 
-// Encerramento limpo (importante para Docker e PM2)
 process.on("SIGINT", async () => {
   console.log("\n🛑 Encerrando servidor...");
   await prisma.$disconnect();
